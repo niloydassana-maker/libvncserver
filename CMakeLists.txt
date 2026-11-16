@@ -776,16 +776,22 @@ endif(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
 # libjpeg-turbo resolve tjCompress2 to our copy instead of the one it asked for
 # (issue #729). This asserts the property that actually broke, which the functional
 # tests could not catch: the symbols must not appear in the dynamic symbol table.
-if(UNIX AND NOT APPLE AND WITH_JPEG AND FOUND_LIBJPEG_TURBO)
+#
+# It is deliberately registered whenever libvncserver is built on ELF, not only
+# when libjpeg-turbo is present. A guard that skips itself on the platform where
+# the bug lives is worse than no guard: it reports green while proving nothing.
+if(UNIX AND NOT APPLE AND WITH_LIBVNCSERVER)
   find_program(READELF_EXECUTABLE readelf)
-  if(READELF_EXECUTABLE)
-    add_test(NAME no_exported_turbojpeg_symbols
-             COMMAND ${CMAKE_COMMAND}
-                     -DSO=$<TARGET_FILE:vncserver>
-                     -DREADELF=${READELF_EXECUTABLE}
-                     -DGREP=${CMAKE_COMMAND}
-                     -P ${CMAKE_CURRENT_SOURCE_DIR}/test/check-exported-symbols.cmake)
+  if(NOT READELF_EXECUTABLE)
+    message(FATAL_ERROR
+      "readelf not found: cannot verify that the bundled TurboJPEG symbols are "
+      "hidden. Install binutils, or the #729 regression check cannot run.")
   endif()
+  add_test(NAME no_exported_turbojpeg_symbols
+           COMMAND ${CMAKE_COMMAND}
+                   -DSO=$<TARGET_FILE:vncserver>
+                   -DREADELF=${READELF_EXECUTABLE}
+                   -P ${CMAKE_CURRENT_SOURCE_DIR}/test/check-exported-symbols.cmake)
 endif()
 if(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
     add_test(NAME wstest COMMAND test_wstest)
