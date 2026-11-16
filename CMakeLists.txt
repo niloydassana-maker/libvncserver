@@ -770,6 +770,23 @@ endif(UNIX)
 if(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
     add_test(NAME turbojpeg COMMAND test_tjunittest)
 endif(WITH_JPEG AND FOUND_LIBJPEG_TURBO)
+
+# libvncserver bundles a private copy of the TurboJPEG API in src/common/turbojpeg.c.
+# Exporting its entry points makes any application that links both libvncserver and
+# libjpeg-turbo resolve tjCompress2 to our copy instead of the one it asked for
+# (issue #729). This asserts the property that actually broke, which the functional
+# tests could not catch: the symbols must not appear in the dynamic symbol table.
+if(UNIX AND NOT APPLE AND WITH_JPEG AND FOUND_LIBJPEG_TURBO)
+  find_program(READELF_EXECUTABLE readelf)
+  if(READELF_EXECUTABLE)
+    add_test(NAME no_exported_turbojpeg_symbols
+             COMMAND ${CMAKE_COMMAND}
+                     -DSO=$<TARGET_FILE:vncserver>
+                     -DREADELF=${READELF_EXECUTABLE}
+                     -DGREP=${CMAKE_COMMAND}
+                     -P ${CMAKE_CURRENT_SOURCE_DIR}/test/check-exported-symbols.cmake)
+  endif()
+endif()
 if(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
     add_test(NAME wstest COMMAND test_wstest)
 endif(LIBVNCSERVER_WITH_WEBSOCKETS AND WITH_LIBVNCSERVER)
